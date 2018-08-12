@@ -63,7 +63,7 @@ if [ "$OS" == null ]; then
         elif [[ $unamestr == 'FreeBSD' ]]; then
                OS='freebsd'
         elif [[ $unamestr == 'Darwin' ]]; then
-               OS='osx'	       
+               OS='osx'
         else
                 echo "OS not recognized, Use \`-o\` and specify the OS as an argument"
                 exit 3
@@ -76,40 +76,47 @@ fi
 determine_service_tool() {
 if [[ $OS == linux ]]; then
         if command -v systemctl >/dev/null 2>&1; then
-                SERVICETOOL="systemctl status $SERVICE | grep -i Active"
+                SERVICETOOL="systemctl status ${SERVICE} | grep -i Active"
                 LISTTOOL="systemctl"
-                if [ $USERNAME ]; then
-                    SERVICETOOL="sudo -u $USERNAME systemctl status $SERVICE"
-                    LISTTOOL="sudo -u $USERNAME systemctl"
+                if [ "${USERNAME}" ]; then
+                    SERVICETOOL="sudo -u ${USERNAME} systemctl status ${SERVICE}"
+                    LISTTOOL="sudo -u ${USERNAME} systemctl"
                 fi
 		TRUST_EXIT_CODE=1
         elif command -v service >/dev/null 2>&1; then
-                SERVICETOOL="service $SERVICE status"
+                SERVICETOOL="service ${SERVICE} status"
                 LISTTOOL="service --status-all"
-                if [ $USERNAME ]; then
-                    SERVICETOOL="sudo -u $USERNAME service $SERVICE status"
-                    LISTTOOL="sudo -u $USERNAME service --status-all"
+                if [ "${USERNAME}" ]; then
+                    SERVICETOOL="sudo -u ${USERNAME} service ${SERVICE} status"
+                    LISTTOOL="sudo -u ${USERNAME} service --status-all"
                 fi
         elif command -v initctl >/dev/null 2>&1; then
-                SERVICETOOL="status $SERVICE"
+                SERVICETOOL="status ${SERVICE}"
                 LISTTOOL="initctl list"
-                if [ $USERNAME ]; then
-                    SERVICETOOL="sudo -u $USERNAME status $SERVICE"
-                    LISTTOOL="sudo -u $USERNAME initctl list"
+                if [ "${USERNAME}" ]; then
+                    SERVICETOOL="sudo -u ${USERNAME} status ${SERVICE}"
+                    LISTTOOL="sudo -u ${USERNAME} initctl list"
                 fi
         elif command -v chkconfig >/dev/null 2>&1; then
                 SERVICETOOL=chkconfig
                 LISTTOOL="chkconfig --list"
-                if [ $USERNAME ]; then
-                    SERVICETOOL="sudo -u $USERNAME chkconfig"
-                    LISTTOOL="sudo -u $USERNAME chkconfig --list"
+                if [ "${USERNAME}" ]; then
+                    SERVICETOOL="sudo -u ${USERNAME} chkconfig"
+                    LISTTOOL="sudo -u ${USERNAME} chkconfig --list"
                 fi
-        elif [ -f /etc/init.d/$SERVICE ] || [ -d /etc/init.d ]; then
-                SERVICETOOL="/etc/init.d/$SERVICE status | tail -1"
+        elif command -v /sbin/rc-service >/dev/null 2>&1; then
+                SERVICETOOL="/sbin/rc-service ${SERVICE} status"
+                LISTTOOL="/sbin/rc-service --list"
+                if [ "${USERNAME}" ]; then
+                    SERVICETOOL="sudo -u ${USERNAME} rc-service ${SERVICE} status"
+                    LISTTOOL="sudo -u ${USERNAME} rc-service --list"
+                fi
+        elif [[ -f /etc/init.d/"${SERVICE}" ]]; then
+                SERVICETOOL="/etc/init.d/${SERVICE} status | tail -1"
                 LISTTOOL="ls -1 /etc/init.d/"
-                if [ $USERNAME ]; then
-                    SERVICETOOL="sudo -u $USERNAME /etc/init.d/$SERVICE status | tail -1"
-                    LISTTOOL="sudo -u $USERNAME ls -1 /etc/init.d/"
+                if [ "${USERNAME}" ]; then
+                    SERVICETOOL="sudo -u ${USERNAME} /etc/init.d/${SERVICE} status | tail -1"
+                    LISTTOOL="sudo -u ${USERNAME} ls -1 /etc/init.d/"
                 fi
         else
                 echo "Unable to determine the system's service tool!"
@@ -119,10 +126,10 @@ fi
 
 if [[ $OS == freebsd ]]; then
         if command -v service >/dev/null 2>&1; then
-                SERVICETOOL="service $SERVICE status"
+                SERVICETOOL="service ${SERVICE} status"
                 LISTTOOL="service -l"
-        elif [ -f /etc/rc.d/$SERVICE ] || [ -d /etc/rc.d ]; then
-                SERVICETOOL="/etc/rc.d/$SERVICE status"
+        elif [ -f /etc/rc.d/${SERVICE} ] || [ -d /etc/rc.d ]; then
+                SERVICETOOL="/etc/rc.d/${SERVICE} status"
                 LISTTOOL="ls -1 /etc/rc.d/"
         else
                 echo "Unable to determine the system's service tool!"
@@ -131,23 +138,23 @@ if [[ $OS == freebsd ]]; then
 fi
 
 if [[ $OS == osx ]]; then
-        if [ -f /usr/sbin/serveradmin >/dev/null 2>&1 ] && serveradmin list | grep "$SERVICE" 2>&1 >/dev/null; then
-                SERVICETOOL="serveradmin status $SERVICE"
+        if [ -f /usr/sbin/serveradmin >/dev/null 2>&1 ] && serveradmin list | grep "${SERVICE}" 2>&1 >/dev/null; then
+                SERVICETOOL="serveradmin status ${SERVICE}"
                 LISTTOOL="serveradmin list"
         elif [ -f /Applications/Server.app/Contents/ServerRoot/usr/sbin/serveradmin >/dev/null 2>&1 ] && \
                /Applications/Server.app/Contents/ServerRoot/usr/sbin/serveradmin list | \
-                grep "$SERVICE" 2>&1 >/dev/null; then
-                SERVICETOOL="/Applications/Server.app/Contents/ServerRoot/usr/sbin/serveradmin status $SERVICE"
+                grep "${SERVICE}" 2>&1 >/dev/null; then
+                SERVICETOOL="/Applications/Server.app/Contents/ServerRoot/usr/sbin/serveradmin status ${SERVICE}"
                 LISTTOOL="/Applications/Server.app/Contents/ServerRoot/usr/sbin/serveradmin list"
         elif command -v launchctl >/dev/null 2>&1; then
-                SERVICETOOL="launchctl list | grep -v ^- | grep $SERVICE || echo $SERVICE not running! "
+                SERVICETOOL="launchctl list | grep -v ^- | grep ${SERVICE} || echo ${SERVICE} not running! "
                 LISTTOOL="launchctl list"
-                if [ $USERNAME ]; then
-                        SERVICETOOL="sudo -u $USERNAME launchctl list | grep -v ^- | grep $SERVICE || echo $SERVICE not running! "
-                        LISTTOOL="sudo -u $USERNAME launchctl list"
+                if [ "${USERNAME}" ]; then
+                        SERVICETOOL="sudo -u ${USERNAME} launchctl list | grep -v ^- | grep ${SERVICE} || echo ${SERVICE} not running! "
+                        LISTTOOL="sudo -u ${USERNAME} launchctl list"
                 fi
         elif command -v service >/dev/null 2>&1; then
-                SERVICETOOL="service --test-if-configured-on $SERVICE"
+                SERVICETOOL="service --test-if-configured-on ${SERVICE}"
                 LISTTOOL="service list"
         else
                 echo "Unable to determine the system's service tool!"
@@ -157,7 +164,7 @@ fi
 
 if [[ $OS == aix ]]; then
         if command -v lssrc >/dev/null 2>&1; then
-                SERVICETOOL="lssrc -s $SERVICE | grep -v Subsystem"
+                SERVICETOOL="lssrc -s ${SERVICE} | grep -v Subsystem"
                 LISTTOOL="lssrc -a"
         else
                 echo "Unable to determine the system's service tool!"
@@ -225,14 +232,14 @@ else
 determine_service_tool
 fi
 
-# -l conflicts with -t                                                                                                                                                   
+# -l conflicts with -t
 if [ $MANUAL -eq 1 ] && [ $LIST -eq 1 ]; then
     echo "Options conflict: \`\`-t'' and \`\`-l''"
     exit 2
 fi
 
-if [ $LIST -eq 1 ]; then
-        if [[ $LISTTOOL != null ]]; then
+if [ "${LIST}" -eq 1 ]; then
+        if [[ "${LISTTOOL}" != null ]]; then
                 $LISTTOOL
                 exit 0
         else
@@ -242,7 +249,7 @@ if [ $LIST -eq 1 ]; then
 fi
 
 # Check the status of a service
-STATUS_MSG=$(eval "$SERVICETOOL" 2>&1)
+STATUS_MSG=$(eval "${SERVICETOOL}" 2>&1)
 EXIT_CODE=$?
 
 ## Exit code from the service tool - if it's non-zero, we should
@@ -283,6 +290,14 @@ case $STATUS_MSG in
 *dead*)
         echo "$STATUS_MSG"
         exit $CRITICAL
+        ;;
+*crashed*)
+        echo "$STATUS_MSG"
+        exit $CRITICAL
+        ;;
+*started*)
+        echo "$STATUS_MSG"
+        exit $OK
         ;;
 *running*)
         echo "$STATUS_MSG"
@@ -325,11 +340,11 @@ case $STATUS_MSG in
         exit $CRITICAL
         ;;
 [1-9][1-9]*)
-        echo "$SERVICE running: $STATUS_MSG"
+        echo "${SERVICE} running: $STATUS_MSG"
         exit $OK
         ;;
 "")
-	echo "$SERVICE is not running: no output from service command"
+	echo "${SERVICE} is not running: no output from service command"
 	exit $CRITICAL
 	;;
 *)
@@ -338,4 +353,3 @@ case $STATUS_MSG in
         exit $UNKNOWN
         ;;
 esac
-
